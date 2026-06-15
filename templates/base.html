@@ -1,0 +1,143 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{% block title %}SpendWise{% endblock %} — Smart Expense Tracking</title>
+  <link rel="stylesheet" href="{% static 'css/main.css' %}">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+  {% block extra_head %}{% endblock %}
+</head>
+<body id="body" class="">
+
+{% if user.is_authenticated %}
+<nav class="navbar">
+  <a href="{% url 'dashboard' %}" class="nav-logo">
+    <i class="fas fa-wallet"></i>Spend<span>Wise</span>
+  </a>
+  <ul class="nav-links">
+    <li><a href="{% url 'dashboard' %}" class="{% if request.resolver_match.url_name == 'dashboard' %}active{% endif %}">
+      <i class="fas fa-chart-line"></i> My Transactions
+    </a></li>
+    <li><a href="{% url 'charts' %}" class="{% if request.resolver_match.url_name == 'charts' %}active{% endif %}">
+      <i class="fas fa-chart-pie"></i> My Charts
+    </a></li>
+    <li><a href="{% url 'history' %}" class="{% if request.resolver_match.url_name == 'history' %}active{% endif %}">
+      <i class="fas fa-history"></i> History
+    </a></li>
+    <li><a href="{% url 'profile' %}" class="{% if request.resolver_match.url_name == 'profile' %}active{% endif %}">
+      <i class="fas fa-user"></i> Profile
+    </a></li>
+    <li><a href="{% url 'logout' %}"><i class="fas fa-sign-out-alt"></i> Logout</a></li>
+  </ul>
+  <div class="nav-actions">
+    <button class="btn-theme" onclick="toggleTheme()" title="Toggle theme"><i class="fas fa-moon" id="theme-icon"></i></button>
+    <a href="{% url 'profile' %}">
+      <div class="nav-avatar" title="{{ user.username }}">
+        {% if user.profile.profile_picture %}
+          <img src="{{ user.profile.profile_picture.url }}" alt="">
+        {% else %}
+          {{ user.profile.get_initials }}
+        {% endif %}
+      </div>
+    </a>
+  </div>
+</nav>
+{% endif %}
+
+<div id="toast-container"></div>
+
+{% if messages %}
+<div style="position:fixed;top:80px;right:20px;z-index:500;max-width:350px;">
+  {% for msg in messages %}
+  <div class="alert {% if msg.tags == 'error' %}alert-error{% else %}alert-success{% endif %}" style="margin-bottom:8px;">
+    <i class="fas {% if msg.tags == 'error' %}fa-exclamation-circle{% else %}fa-check-circle{% endif %}"></i>
+    {{ msg }}
+  </div>
+  {% endfor %}
+</div>
+{% endif %}
+
+{% block content %}{% endblock %}
+
+<!-- Confirm Dialog -->
+<div class="confirm-overlay" id="confirmOverlay">
+  <div class="confirm-box">
+    <i class="fas fa-trash-alt"></i>
+    <h3>Delete Transaction?</h3>
+    <p>This action cannot be undone.</p>
+    <div class="confirm-actions">
+      <button class="btn btn-ghost" onclick="closeConfirm()">Cancel</button>
+      <button class="btn btn-danger" id="confirmBtn">Delete</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// Theme
+function toggleTheme() {
+  const body = document.getElementById('body');
+  const icon = document.getElementById('theme-icon');
+  body.classList.toggle('light-mode');
+  const isLight = body.classList.contains('light-mode');
+  icon.className = isLight ? 'fas fa-sun' : 'fas fa-moon';
+  localStorage.setItem('theme', isLight ? 'light' : 'dark');
+}
+
+(function() {
+  const t = localStorage.getItem('theme');
+  if (t === 'light') {
+    document.getElementById('body').classList.add('light-mode');
+    const i = document.getElementById('theme-icon');
+    if (i) i.className = 'fas fa-sun';
+  }
+})();
+
+// Toast
+function showToast(msg, type='info') {
+  const c = document.getElementById('toast-container');
+  const t = document.createElement('div');
+  t.className = `toast ${type}`;
+  const icons = {success:'fa-check-circle', error:'fa-exclamation-circle', info:'fa-info-circle'};
+  t.innerHTML = `<i class="fas ${icons[type]||'fa-info-circle'}"></i> ${msg}`;
+  c.appendChild(t);
+  setTimeout(() => t.remove(), 4000);
+}
+
+// Confirm delete
+let confirmCallback = null;
+function showConfirm(cb) {
+  confirmCallback = cb;
+  document.getElementById('confirmOverlay').classList.add('active');
+}
+function closeConfirm() {
+  document.getElementById('confirmOverlay').classList.remove('active');
+  confirmCallback = null;
+}
+document.getElementById('confirmBtn').onclick = function() {
+  if (confirmCallback) confirmCallback();
+  closeConfirm();
+};
+document.getElementById('confirmOverlay').onclick = function(e) {
+  if (e.target === this) closeConfirm();
+};
+
+// Auto dismiss django messages
+setTimeout(() => {
+  document.querySelectorAll('.alert').forEach(el => el.remove());
+}, 4000);
+
+function getCookie(name) {
+  let val = null;
+  document.cookie.split(';').forEach(c => {
+    const [k, v] = c.trim().split('=');
+    if (k === name) val = decodeURIComponent(v);
+  });
+  return val;
+}
+</script>
+
+{% block extra_js %}{% endblock %}
+</body>
+</html>

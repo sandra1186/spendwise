@@ -1,0 +1,114 @@
+{% extends 'base.html' %}
+{% block title %}Profile{% endblock %}
+
+{% block content %}
+<div class="page-wrapper">
+  <div class="container" style="max-width:800px">
+    <div class="page-title" style="margin-bottom:24px">
+      <i class="fas fa-user-circle" style="color:var(--accent)"></i> My Profile
+    </div>
+
+    <!-- Profile Card -->
+    <div class="card" style="margin-bottom:20px">
+      <div style="display:flex;align-items:center;gap:24px;flex-wrap:wrap">
+        <div class="profile-avatar-wrap">
+          <div class="profile-avatar">
+            {% if profile.profile_picture %}
+              <img src="{{ profile.profile_picture.url }}" alt="">
+            {% else %}
+              {{ profile.get_initials }}
+            {% endif %}
+          </div>
+        </div>
+        <div>
+          <div style="font-family:'Space Grotesk',sans-serif;font-size:1.4rem;font-weight:700">
+            {{ profile.full_name|default:user.username }}
+          </div>
+          <div style="color:var(--text-secondary);font-size:0.9rem;margin-top:4px">
+            <i class="fas fa-at"></i> {{ user.username }}
+          </div>
+          <div style="color:var(--text-secondary);font-size:0.9rem;margin-top:2px">
+            <i class="fas fa-envelope"></i> {{ user.email|default:"No email set" }}
+          </div>
+          <div style="color:var(--text-muted);font-size:0.8rem;margin-top:6px">
+            <i class="fas fa-calendar-alt"></i> Member since {{ profile.created_at|date:"F Y" }}
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Edit Profile Form -->
+    <div class="card" style="margin-bottom:20px">
+      <div style="font-family:'Space Grotesk',sans-serif;font-size:1rem;font-weight:700;margin-bottom:20px;display:flex;align-items:center;gap:8px">
+        <i class="fas fa-edit" style="color:var(--accent)"></i> Edit Profile
+      </div>
+      <form method="POST" enctype="multipart/form-data">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="update_profile">
+        <div class="form-row">
+          <div class="form-group">
+            <label>Full Name</label>
+            <input type="text" name="full_name" class="form-control" value="{{ profile.full_name|default:'' }}">
+          </div>
+          <div class="form-group">
+            <label>Email</label>
+            <input type="email" name="email" class="form-control" value="{{ user.email|default:'' }}">
+          </div>
+        </div>
+        <div class="form-group">
+          <label>Profile Picture</label>
+          <input type="file" name="profile_picture" class="form-control" accept="image/*">
+          {% if profile.profile_picture %}
+          <div style="margin-top:8px;font-size:0.8rem;color:var(--text-muted)">
+            Current: <a href="{{ profile.profile_picture.url }}" target="_blank" style="color:var(--accent)">View photo</a>
+          </div>
+          {% endif %}
+        </div>
+        <button type="submit" class="btn btn-primary"><i class="fas fa-save"></i> Update Profile</button>
+      </form>
+    </div>
+
+    <!-- Change Password -->
+    <div class="card">
+      <div style="font-family:'Space Grotesk',sans-serif;font-size:1rem;font-weight:700;margin-bottom:20px;display:flex;align-items:center;gap:8px">
+        <i class="fas fa-lock" style="color:var(--accent)"></i> Change Password
+      </div>
+      <form method="POST">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="change_password">
+        <div class="form-group">
+          <label>Current Password</label>
+          <input type="password" name="old_password" class="form-control" placeholder="Your current password" required>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>New Password</label>
+            <input type="password" name="new_password" id="newpw" class="form-control" placeholder="Min 8 characters" required>
+          </div>
+          <div class="form-group">
+            <label>Confirm New Password</label>
+            <input type="password" name="confirm_password" class="form-control" placeholder="Repeat new password" required oninput="checkPw()">
+          </div>
+        </div>
+        <div id="pw-check" style="font-size:0.8rem;margin-bottom:12px;height:18px"></div>
+        <button type="submit" class="btn btn-primary"><i class="fas fa-key"></i> Change Password</button>
+      </form>
+    </div>
+
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function checkPw() {
+  const p1 = document.getElementById('newpw').value;
+  const p2 = event.target.value;
+  const el = document.getElementById('pw-check');
+  if (!p2) { el.textContent = ''; return; }
+  el.innerHTML = p1 === p2
+    ? '<span style="color:var(--income)"><i class="fas fa-check"></i> Passwords match</span>'
+    : '<span style="color:var(--expense)"><i class="fas fa-times"></i> Passwords do not match</span>';
+}
+</script>
+{% endblock %}

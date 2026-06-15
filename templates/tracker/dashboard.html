@@ -1,0 +1,440 @@
+{% extends 'base.html' %}
+{% block title %}My Transactions{% endblock %}
+
+{% block content %}
+<div class="page-wrapper">
+  <div class="container">
+
+    <!-- Summary Cards -->
+    <div class="summary-grid">
+      <div class="summary-card income">
+        <div class="summary-icon"><i class="fas fa-arrow-down"></i></div>
+        <div class="summary-info">
+          <label>Total Income</label>
+          <form id="incomeForm" style="display:flex;align-items:center;gap:6px">
+            {% csrf_token %}
+            <span class="summary-value">₹</span>
+            <input
+              type="number"
+              name="total_income"
+              id="total-income"
+              value="{{ summary.total_income|floatformat:2 }}"
+              min="0"
+              step="0.01"
+              class="summary-value"
+              style="width:150px;background:transparent;border:0;padding:0;outline:none"
+              aria-label="Total Income"
+              required
+            >
+            <button type="submit" class="btn btn-ghost btn-icon btn-sm" title="Save total income">
+              <i class="fas fa-save"></i>
+            </button>
+          </form>
+        </div>
+      </div>
+      <div class="summary-card expense">
+        <div class="summary-icon"><i class="fas fa-arrow-up"></i></div>
+        <div class="summary-info">
+          <label>Total Expenses</label>
+          <div class="summary-value" id="total-expense">₹{{ summary.total_expense|floatformat:2 }}</div>
+        </div>
+      </div>
+      <div class="summary-card net">
+        <div class="summary-icon"><i class="fas fa-wallet"></i></div>
+        <div class="summary-info">
+          <label>Net Balance</label>
+          <div class="summary-value" id="net-income">₹{{ summary.net_income|floatformat:2 }}</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="layout-with-sidebar">
+      <!-- Filter Sidebar -->
+      <aside class="filter-sidebar">
+        <div class="filter-title"><i class="fas fa-filter"></i> Filters</div>
+        <form id="filterForm">
+          <div class="filter-section">
+            <div style="font-size:0.78rem;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px">Type</div>
+            <div class="radio-group">
+              <label class="radio-item"><input type="radio" name="type" value="expense" checked> <span style="color:var(--expense)">● Expense</span></label>
+            </div>
+          </div>
+
+          <div class="filter-section">
+            <div style="font-size:0.78rem;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px">Date Range</div>
+            <div class="form-group">
+              <label>From</label>
+              <input type="date" name="date_from" class="form-control" value="{{ filters.date_from }}" style="font-size:0.82rem;padding:8px 10px">
+            </div>
+            <div class="form-group">
+              <label>To</label>
+              <input type="date" name="date_to" class="form-control" value="{{ filters.date_to }}" style="font-size:0.82rem;padding:8px 10px">
+            </div>
+          </div>
+
+          <div class="filter-section">
+            <div style="font-size:0.78rem;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px">Categories</div>
+            <div class="checkbox-group" style="max-height:200px;overflow-y:auto">
+              {% for cat in all_categories %}
+              <label class="checkbox-item">
+                <input type="checkbox" name="categories" value="{{ cat }}" {% if cat in filters.categories %}checked{% endif %}>
+                <span class="cat-dot cat-{{ cat|slugify }}"></span> {{ cat }}
+              </label>
+              {% endfor %}
+            </div>
+          </div>
+
+          <button type="submit" class="btn btn-primary" style="width:100%;justify-content:center">
+            <i class="fas fa-check"></i> Apply Filters
+          </button>
+          <a href="{% url 'dashboard' %}" class="btn btn-ghost" style="width:100%;justify-content:center;margin-top:8px">
+            <i class="fas fa-times"></i> Clear
+          </a>
+        </form>
+      </aside>
+
+      <!-- Main Content -->
+      <div>
+        <div class="page-header">
+          <div>
+            <div class="page-title">
+              <i class="fas fa-list-ul" style="color:var(--accent)"></i>
+              Transactions
+              <button class="btn-fab" onclick="openModal('addModal')" title="Add transaction">
+                <i class="fas fa-plus"></i>
+              </button>
+            </div>
+            <div class="welcome-msg">Hello, {{ user.profile.full_name|default:user.username }} 👋</div>
+          </div>
+          <div style="display:flex;gap:10px;align-items:center">
+            <div class="search-wrap">
+              <i class="fas fa-search"></i>
+              <input type="text" class="form-control" id="searchBox" placeholder="Search..." value="{{ filters.search }}" style="width:180px;font-size:0.85rem">
+            </div>
+            <a href="{% url 'export_csv' %}" class="btn btn-ghost btn-sm">
+              <i class="fas fa-download"></i> Export CSV
+            </a>
+          </div>
+        </div>
+
+        <div class="card" style="padding:0;overflow:hidden">
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Date</th>
+                  <th>Time</th>
+                  <th>Category</th>
+                  <th>Type</th>
+                  <th>Amount</th>
+                  <th>Description</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody id="txBody">
+                {% for tx in transactions %}
+                <tr>
+                  <td>{{ tx.date|date:"d M Y" }}</td>
+                  <td style="color:var(--text-secondary)">{{ tx.time|time:"H:i" }}</td>
+                  <td>
+                    <span class="cat-dot cat-{{ tx.category|slugify }}"></span>
+                    {{ tx.category }}
+                  </td>
+                  <td><span class="badge badge-{{ tx.type }}">{{ tx.get_type_display }}</span></td>
+                  <td>
+                    <span class="amount-{{ tx.type }}">
+                      {% if tx.type == 'income' %}+{% else %}-{% endif %}₹{{ tx.amount|floatformat:2 }}
+                    </span>
+                  </td>
+                  <td style="color:var(--text-secondary);max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">
+                    {{ tx.description|default:"—" }}
+                  </td>
+                  <td>
+                    <div style="display:flex;gap:6px">
+                      <button class="btn btn-ghost btn-icon btn-sm" onclick="editTx({{ tx.pk }})" title="Edit">
+                        <i class="fas fa-edit"></i>
+                      </button>
+                      <button class="btn btn-danger btn-icon btn-sm" onclick="deleteTx({{ tx.pk }})" title="Delete">
+                        <i class="fas fa-trash"></i>
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+                {% empty %}
+                <tr><td colspan="7">
+                  <div class="empty-state">
+                    <i class="fas fa-receipt"></i>
+                    <h3>No transactions yet</h3>
+                    <p>Click the + button to add your first transaction</p>
+                  </div>
+                </td></tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Add Transaction Modal -->
+<div class="modal-overlay" id="addModal">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title"><i class="fas fa-plus-circle" style="color:var(--accent)"></i> Add Transaction</div>
+      <button class="modal-close" onclick="closeModal('addModal')"><i class="fas fa-times"></i></button>
+    </div>
+
+    <form id="addForm">
+      {% csrf_token %}
+      <input type="hidden" name="type" value="expense">
+
+      <div class="form-row">
+        <div class="form-group">
+          <label>Amount (₹)</label>
+          <input type="number" name="amount" class="form-control" placeholder="0.00" step="0.01" min="0.01" required>
+        </div>
+        <div class="form-group">
+          <label>Category</label>
+          <select name="category" id="txCategory" class="form-control" required>
+            <option value="">Select category</option>
+            <optgroup label="Expense">
+              {% for cat in expense_categories %}
+              <option value="{{ cat }}">{{ cat }}</option>
+              {% endfor %}
+            </optgroup>
+          </select>
+        </div>
+      </div>
+
+      <div class="form-row">
+        <div class="form-group">
+          <label>Date</label>
+          <input type="date" name="date" class="form-control" id="txDate" required>
+        </div>
+        <div class="form-group">
+          <label>Time</label>
+          <input type="time" name="time" class="form-control" id="txTime" required>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label>Description (optional)</label>
+        <textarea name="description" class="form-control" rows="2" placeholder="Add a note..."></textarea>
+      </div>
+
+      <div style="display:flex;gap:10px;margin-top:4px">
+        <button type="submit" class="btn btn-primary" style="flex:1;justify-content:center" id="addSubmitBtn">
+          <i class="fas fa-save"></i> Save Transaction
+        </button>
+        <button type="button" class="btn btn-ghost" onclick="closeModal('addModal')">Cancel</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Edit Transaction Modal -->
+<div class="modal-overlay" id="editModal">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title"><i class="fas fa-edit" style="color:var(--accent)"></i> Edit Transaction</div>
+      <button class="modal-close" onclick="closeModal('editModal')"><i class="fas fa-times"></i></button>
+    </div>
+    <form id="editForm">
+      {% csrf_token %}
+      <input type="hidden" id="editId">
+
+      <input type="hidden" name="type" value="expense">
+
+      <div class="form-row">
+        <div class="form-group">
+          <label>Amount (₹)</label>
+          <input type="number" name="amount" id="editAmount" class="form-control" step="0.01" min="0.01" required>
+        </div>
+        <div class="form-group">
+          <label>Category</label>
+          <select name="category" id="editCategory" class="form-control" required>
+            <option value="">Select category</option>
+            <optgroup label="Expense" id="editExpenseOpts">
+              {% for cat in expense_categories %}<option value="{{ cat }}">{{ cat }}</option>{% endfor %}
+            </optgroup>
+          </select>
+        </div>
+      </div>
+
+      <div class="form-row">
+        <div class="form-group">
+          <label>Date</label>
+          <input type="date" name="date" id="editDate" class="form-control" required>
+        </div>
+        <div class="form-group">
+          <label>Time</label>
+          <input type="time" name="time" id="editTime" class="form-control" required>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label>Description</label>
+        <textarea name="description" id="editDesc" class="form-control" rows="2"></textarea>
+      </div>
+
+      <div style="display:flex;gap:10px;margin-top:4px">
+        <button type="submit" class="btn btn-primary" style="flex:1;justify-content:center">
+          <i class="fas fa-save"></i> Update
+        </button>
+        <button type="button" class="btn btn-ghost" onclick="closeModal('editModal')">Cancel</button>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// Set today's date/time defaults
+const now = new Date();
+document.getElementById('txDate').value = now.toISOString().split('T')[0];
+document.getElementById('txTime').value = now.toTimeString().slice(0,5);
+
+// Modal
+function openModal(id) { document.getElementById(id).classList.add('active'); }
+function closeModal(id) { document.getElementById(id).classList.remove('active'); }
+document.querySelectorAll('.modal-overlay').forEach(m => {
+  m.addEventListener('click', e => { if (e.target === m) m.classList.remove('active'); });
+});
+
+const incomeInput = document.getElementById('total-income');
+const totalExpense = Number('{{ summary.total_expense }}');
+const netBalance = document.getElementById('net-income');
+
+function updateNetBalance() {
+  const income = Number(incomeInput.value) || 0;
+  netBalance.textContent = `₹${(income - totalExpense).toFixed(2)}`;
+}
+
+incomeInput.addEventListener('input', updateNetBalance);
+
+document.getElementById('incomeForm').addEventListener('submit', async function(e) {
+  e.preventDefault();
+  try {
+    const res = await fetch('{% url "update_total_income" %}', {
+      method: 'POST',
+      body: new FormData(this),
+      headers: {'X-Requested-With': 'XMLHttpRequest'}
+    });
+    const json = await res.json();
+    if (!res.ok || !json.success) {
+      showToast(json.message || 'Enter a valid income amount.', 'error');
+      return;
+    }
+    incomeInput.value = Number(json.summary.total_income).toFixed(2);
+    netBalance.textContent = `₹${Number(json.summary.net_income).toFixed(2)}`;
+    showToast(json.message, 'success');
+  } catch (error) {
+    showToast('Unable to save total income. Please try again.', 'error');
+  }
+});
+
+// Add form submit
+document.getElementById('addForm').addEventListener('submit', async function(e) {
+  e.preventDefault();
+  const btn = document.getElementById('addSubmitBtn');
+  btn.innerHTML = '<span class="spinner"></span> Saving...';
+  btn.disabled = true;
+  try {
+    const data = new FormData(this);
+    const res = await fetch('{% url "add_transaction" %}', {
+      method: 'POST',
+      body: data,
+      headers: {'X-Requested-With': 'XMLHttpRequest'}
+    });
+    const json = await res.json();
+    if (!res.ok || !json.success) {
+      const errors = Object.values(json.errors || {})
+        .flat()
+        .map(error => error.message)
+        .join(' ');
+      showToast(errors || json.message || 'Please check your inputs.', 'error');
+      return;
+    }
+
+    showToast(json.message, 'success');
+    closeModal('addModal');
+    window.location.assign(json.redirect_url);
+  } catch (error) {
+    showToast('Unable to save the transaction. Please try again.', 'error');
+  } finally {
+    btn.innerHTML = '<i class="fas fa-save"></i> Save Transaction';
+    btn.disabled = false;
+  }
+});
+
+// Edit
+async function editTx(id) {
+  const res = await fetch(`/transaction/${id}/edit/`, {headers: {'X-Requested-With': 'XMLHttpRequest'}});
+  const d = await res.json();
+  document.getElementById('editId').value = d.id;
+  document.getElementById('editAmount').value = d.amount;
+  document.getElementById('editDate').value = d.date;
+  document.getElementById('editTime').value = d.time.slice(0,5);
+  document.getElementById('editDesc').value = d.description;
+  // Set category
+  const sel = document.getElementById('editCategory');
+  for (let opt of sel.options) { if (opt.value === d.category) { sel.value = d.category; break; } }
+  openModal('editModal');
+}
+
+document.getElementById('editForm').addEventListener('submit', async function(e) {
+  e.preventDefault();
+  const id = document.getElementById('editId').value;
+  const data = new FormData(this);
+  const res = await fetch(`/transaction/${id}/edit/`, {
+    method: 'POST',
+    body: data,
+    headers: {'X-Requested-With': 'XMLHttpRequest'}
+  });
+  const json = await res.json();
+  if (json.success) {
+    showToast('Transaction updated!', 'success');
+    closeModal('editModal');
+    setTimeout(() => location.reload(), 500);
+  } else {
+    showToast('Update failed.', 'error');
+  }
+});
+
+// Delete
+function deleteTx(id) {
+  showConfirm(async () => {
+    const res = await fetch(`/transaction/${id}/delete/`, {
+      method: 'POST',
+      headers: {'X-Requested-With': 'XMLHttpRequest', 'X-CSRFToken': getCookie('csrftoken')}
+    });
+    const json = await res.json();
+    if (json.success) {
+      showToast('Transaction deleted.', 'info');
+      setTimeout(() => location.reload(), 500);
+    }
+  });
+}
+
+// Filters
+document.getElementById('filterForm').addEventListener('submit', function(e) {
+  e.preventDefault();
+  const params = new URLSearchParams(new FormData(this));
+  window.location = '{% url "dashboard" %}?' + params.toString();
+});
+
+// Live search
+let searchTimer;
+document.getElementById('searchBox').addEventListener('input', function() {
+  clearTimeout(searchTimer);
+  searchTimer = setTimeout(() => {
+    const url = new URL(window.location);
+    url.searchParams.set('search', this.value);
+    window.location = url.toString();
+  }, 600);
+});
+</script>
+{% endblock %}
