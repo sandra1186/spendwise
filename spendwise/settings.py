@@ -7,7 +7,7 @@ SECRET_KEY = 'django-insecure-spendwise-secret-key-change-in-production-2024'
 
 DEBUG = True
 
-ALLOWED_HOSTS = ['*']
+ALLOWED_HOSTS = ["*"]
 
 INSTALLED_APPS = [
     'django.contrib.admin',
@@ -80,3 +80,5 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 LOGIN_URL = '/login/'
 LOGIN_REDIRECT_URL = '/dashboard/'
 LOGOUT_REDIRECT_URL = '/login/'
+
+STATIC_ROOT = BASE_DIR / "staticfiles"
