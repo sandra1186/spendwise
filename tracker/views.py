@@ -3,6 +3,8 @@ from django.contrib.auth import authenticate, login, logout
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.models import User
 from django.contrib import messages
+from django.conf import settings
+from django.contrib.sites.shortcuts import get_current_site
 from django.http import JsonResponse, HttpResponse
 from django.db import DatabaseError, transaction
 from django.db.models import Sum, Q
@@ -19,6 +21,32 @@ from .models import UserProfile, Income, Transaction, EXPENSE_CATEGORIES
 from .forms import RegisterForm, TransactionForm, TotalIncomeForm, ProfileForm, ChangePasswordForm
 
 logger = logging.getLogger(__name__)
+
+
+def google_login_status(request):
+    try:
+        from allauth.socialaccount.models import SocialApp
+
+        site = get_current_site(request)
+        app = SocialApp.objects.filter(provider='google', sites=site).first()
+    except Exception:
+        logger.exception('Failed to inspect Google social login configuration')
+        return {
+            'ready': False,
+            'message': 'Google sign-in is not configured for this site.',
+        }
+
+    if not app:
+        return {
+            'ready': False,
+            'message': 'Google sign-in is not configured for this site.',
+        }
+    if not app.client_id or not app.secret or len(app.secret.strip()) < 20:
+        return {
+            'ready': False,
+            'message': 'Google sign-in needs a valid OAuth client ID and client secret.',
+        }
+    return {'ready': True, 'message': ''}
 
 
 def register_view(request):
@@ -52,7 +80,15 @@ def login_view(request):
             return redirect(next_url)
         else:
             error = 'Invalid username or password.'
-    return render(request, 'auth/login.html', {'error': error})
+    return render(
+        request,
+        'auth/login.html',
+        {
+            'error': error,
+            'google_login': google_login_status(request),
+            'debug': settings.DEBUG,
+        },
+    )
 
 
 def logout_view(request):

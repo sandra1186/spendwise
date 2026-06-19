@@ -17,3 +17,10 @@ urlpatterns = [
     path('export/csv/', views.export_csv, name='export_csv'),
     path('api/summary/', views.api_summary, name='api_summary'),
 ]
+
+def home(request):
+    return render(request, 'home.html')
+
+def logout_view(request):
+    logout(request)
+    return redirect('/')
